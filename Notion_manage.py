@@ -18,24 +18,25 @@ headers = {
 }
 
 # 任意のレコード値を取得する関数
-def fetch_record_value(record_name, property_name, property_type):
+def fetch_record_value(record_name, record_value, target_property_name, target_property_type):
+
     url = f"https://api.notion.com/v1/databases/{NOTION_DB_ID_TASK}/query"
     response = requests.post(url, headers=headers)
     data = response.json()
 
     # レコードの取得とフィルタリング
     for result in data.get('results', []):
-        # 名前プロパティの存在と値の確認
-        name_property = result['properties'].get('タスク名', {}).get('title', [])
-
-        # リスト内に record_name が存在するかをチェック
-        if any(item.get('text', {}).get('content') == record_name for item in name_property):
+        # レコード名の存在と値の確認
+        record_names = result['properties'].get(record_name, {}).get('title', [])
+        
+        # リスト内に record_value が存在するかをチェック
+        if any(item.get('text', {}).get('content') == record_value for item in record_names):
             # 報酬プロパティの存在確認
-            reward = result['properties'].get(property_name, {}).get(property_type, 0)
-            print(f"Task: {record_name}, {property_name}: {reward}")
+            reward = result['properties'].get(target_property_name, {}).get(target_property_type, 0)
+            print(f"Task: {record_value}, {target_property_name}: {reward}")
             return reward
 
-    print(f"{record_name}のレコードが見つかりませんでした。")
+    print(f"{record_value}のレコードが見つかりませんでした。")
 
 
-fetch_record_value('決算前確認', '報酬', 'formula')
+fetch_record_value('タスク名','決算前確認', '報酬', 'formula')
