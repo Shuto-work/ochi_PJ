@@ -34,6 +34,10 @@ class NotionWorkloadManagement:
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28"
         }
+        
+        print("NOTION_API_KEY:", self.NOTION_API_KEY)
+        print("SCHEDULE_DB_ID:", self.SCHEDULE_DB_ID)
+        print("WORKLOAD_DB_ID:", self.WORKLOAD_DB_ID)
 
     def get_new_schedule_entries(self) -> List[ScheduleEntity]:
         url = f"https://api.notion.com/v1/databases/{
