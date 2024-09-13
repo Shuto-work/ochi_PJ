@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
-from your_module import NotionWorkloadManagement, ScheduleEntity, Response
+from notion_manage import NotionWorkloadManagement, ScheduleEntity, Response
 
 
 class TestNotionWorkloadManagement(unittest.TestCase):
@@ -13,7 +13,7 @@ class TestNotionWorkloadManagement(unittest.TestCase):
         self.manager = NotionWorkloadManagement(
             self.api_key, self.schedule_db_id, self.workload_db_id)
 
-    @patch('your_module.requests.post')
+    @patch('notion_manage.requests.post')
     def test_get_new_schedule_entries(self, mock_post):
         # モックレスポンスの設定
         mock_response = MagicMock()
@@ -41,7 +41,7 @@ class TestNotionWorkloadManagement(unittest.TestCase):
         self.assertEqual(result[0].title, "Test Title 1")
         self.assertEqual(result[0].flag, 0)
 
-    @patch('your_module.requests.patch')
+    @patch('notion_manage.requests.patch')
     def test_update_workload_entry(self, mock_patch):
         # モックレスポンスの設定
         mock_response = MagicMock()
@@ -58,7 +58,7 @@ class TestNotionWorkloadManagement(unittest.TestCase):
         self.assertIsInstance(result, Response)
         self.assertEqual(result.status_code, 200)
 
-    @patch('your_module.requests.patch')
+    @patch('notion_manage.requests.patch')
     def test_update_schedule_flag(self, mock_patch):
         # モックレスポンスの設定
         mock_response = MagicMock()
