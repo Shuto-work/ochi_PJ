@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -24,19 +25,19 @@ class Response:
 
 
 class NotionWorkloadManagement:
-    def __init__(self, notion_api_key: str, schedule_db_id: str, workload_db_id: str):
-        self.notion_api_key = notion_api_key
-        self.schedule_db_id = schedule_db_id
-        self.workload_db_id = workload_db_id
+    def __init__(self, NOTION_API_KEY: str, SCHEDULE_DB_ID: str, WORKLOAD_DB_ID: str):
+        self.NOTION_API_KEY = NOTION_API_KEY
+        self.SCHEDULE_DB_ID = SCHEDULE_DB_ID
+        self.WORKLOAD_DB_ID = WORKLOAD_DB_ID
         self.headers = {
-            "Authorization": f"Bearer {self.notion_api_key}",
+            "Authorization": f"Bearer {self.NOTION_API_KEY}",
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28"
         }
 
     def get_new_schedule_entries(self) -> List[ScheduleEntity]:
         url = f"https://api.notion.com/v1/databases/{
-            self.schedule_db_id}/query"
+            self.SCHEDULE_DB_ID}/query"
         payload = {
             "filter": {
                 "and": [
@@ -59,7 +60,7 @@ class NotionWorkloadManagement:
         ) for result in results]
 
     def update_workload_entry(self, schedule: ScheduleEntity) -> Response:
-        url = f"https://api.notion.com/v1/pages/{self.workload_db_id}"
+        url = f"https://api.notion.com/v1/pages/{self.WORKLOAD_DB_ID}"
         payload = {
             "properties": {
                 "予定": {
@@ -107,10 +108,10 @@ class NotionWorkloadManagement:
 
 
 if __name__ == "__main__":
-    notion_api_key = "your_notion_api_key_here"
-    schedule_db_id = "your_schedule_db_id_here"
-    workload_db_id = "your_workload_db_id_here"
+    NOTION_API_KEY = os.getenv("notion_api_key")
+    SCHEDULE_DB_ID = os.getenv("schedule_db_id")
+    WORKLOAD_DB_ID = os.getenv("workload_db_id")
 
-    workload_manager = NotionWorkloadManagement(
-        notion_api_key, schedule_db_id, workload_db_id)
-    workload_manager.run()
+    WORKLOAD_MANAGER = NotionWorkloadManagement(
+        NOTION_API_KEY,  SCHEDULE_DB_ID, WORKLOAD_DB_ID)
+    WORKLOAD_MANAGER.run()
