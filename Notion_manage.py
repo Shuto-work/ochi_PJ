@@ -1,7 +1,7 @@
 import requests
 import time
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List
 from dotenv import load_dotenv
 import os
 
@@ -10,7 +10,8 @@ load_dotenv()
 
 class ScheduleEntity:
     def __init__(self, id: str, title: str, client_id: str = "", flag: str = "",
-                 start_date: str = "", end_date: str = "", workload: float = 0):
+                 start_date: str = "", end_date: str = "", workload: float = 0,
+                 parent_task_id: str = "", child_task_ids: List[str] = None):
         self.id = id
         self.title = title
         self.client_id = client_id
@@ -18,6 +19,8 @@ class ScheduleEntity:
         self.start_date = start_date
         self.end_date = end_date
         self.workload = workload
+        self.parent_task_id = parent_task_id
+        self.child_task_ids = child_task_ids or []
 
 
 class Response:
@@ -28,7 +31,6 @@ class Response:
 
 
 class NotionWorkloadManagement:
-
     def __init__(self, NOTION_API_KEY: str, TASK_DB_ID: str, WORKLOAD_SUMMARY_DB_ID: str):
         self.NOTION_API_KEY = NOTION_API_KEY
         self.TASK_DB_ID = TASK_DB_ID
@@ -39,7 +41,8 @@ class NotionWorkloadManagement:
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28"
         }
-        # 予定DB用のプロパティ
+
+        # タスクDB用のプロパティ
         self.task_properties = {
             'flag': 'フラグ',
             'title': '名前',
@@ -48,8 +51,10 @@ class NotionWorkloadManagement:
             'status': 'ステータス',
             'start_date': '開始日',
             'end_date': '終了日',
-            'task': '予定'
+            'parent_task': '親タスク',  # リレーション型
+            'child_tasks': '子タスク'   # リレーション型
         }
+
         # 工数集計DB用のプロパティ
         self.workload_properties = {
             'task': '予定',
@@ -88,9 +93,8 @@ class NotionWorkloadManagement:
     def get_new_schedule_entries(self) -> List[ScheduleEntity]:
         """新規スケジュールエントリーの取得"""
         url = f"https://api.notion.com/v1/databases/{self.TASK_DB_ID}/query"
-
         payload = {
-            "filter": {
+                "filter": {
                 "and": [
                     {
                         "property": self.task_properties['flag'],
@@ -120,61 +124,72 @@ class NotionWorkloadManagement:
         for result in results:
             properties = result.get("properties", {})
 
-            # タイトル取得
-            title = ""
-            if self.task_properties['title'] in properties:
-                title_array = properties[self.task_properties['title']].get(
-                    "title", [])
-                if title_array:
-                    title = title_array[0].get("plain_text", "")
+            # rollupから親タスクの情報を取得
+            parent_task_id = ""
+            parent_task_rollup = properties.get(
+                self.task_properties['parent_task'], {})
+            if parent_task_rollup.get("rollup", {}).get("array", []):
+                parent_task_id = parent_task_rollup["rollup"]["array"][0].get(
+                    "relation", {}).get("id", "")
 
-            # 顧客先ID取得
-            client_id = ""
-            if self.task_properties['client'] in properties:
-                relations = properties[self.task_properties['client']].get(
-                    "relation", [])
-                if relations:
-                    client_id = relations[0].get("id", "")
-
-            # フラグ取得
-            flag = False
-            if self.task_properties['flag'] in properties:
-                flag = properties[self.task_properties['flag']].get(
-                    "checkbox",  False)
-
-            # 工数取得
-            workload = 0
-            if self.task_properties['workload'] in properties:
-                workload = properties[self.task_properties['workload']].get(
-                    "number", 0)
-
-            # 日付取得
-            start_date = ""
-            end_date = ""
-            if self.task_properties['start_date'] in properties:
-                start_date = properties[self.task_properties['start_date']].get(
-                    "date", {}).get("start", "")
-            if self.task_properties['end_date'] in properties:
-                end_date = properties[self.task_properties['end_date']].get(
-                    "date", {}).get("end", "")
+            # 子タスクIDsの取得
+            child_task_ids = []
+            child_task_relations = properties.get(
+                self.task_properties['child_tasks'], {}).get("relation", [])
+            for child in child_task_relations:
+                child_task_ids.append(child.get("id", ""))
 
             schedule_entries.append(
                 ScheduleEntity(
                     id=result["id"],
-                    title=title,
-                    client_id=client_id,
-                    flag=flag,
-                    start_date=start_date,
-                    end_date=end_date,
-                    workload=workload
+                    title=properties.get(self.task_properties['title'], {}).get(
+                        "title", [{}])[0].get("plain_text", ""),
+                    client_id=properties.get(self.task_properties['client'], {}).get("relation", [{}])[0].get(
+                        "id", "") if properties.get(self.task_properties['client'], {}).get("relation") else "",
+                    flag=properties.get(self.task_properties['flag'], {}).get(
+                        "checkbox", False),
+                    start_date=properties.get(self.task_properties['start_date'], {}).get(
+                        "date", {}).get("start", ""),
+                    end_date=properties.get(self.task_properties['end_date'], {}).get(
+                        "date", {}).get("end", ""),
+                    workload=properties.get(
+                        self.task_properties['workload'], {}).get("number", 0),
+                    parent_task_id=parent_task_id,
+                    child_task_ids=child_task_ids
                 )
             )
 
         return schedule_entries
 
+    def update_parent_task(self, schedule: ScheduleEntity) -> Response:
+        """親タスクの更新"""
+        if not schedule.parent_task_id:
+            return Response()
+
+        url = f"https://api.notion.com/v1/pages/{schedule.parent_task_id}"
+
+        # 親タスクの子タスクリレーションを更新
+        payload = {
+            "properties": {
+                self.task_properties['child_tasks']: {
+                    "relation": [{"id": schedule.id}]
+                }
+            }
+        }
+
+        response = requests.patch(url, json=payload, headers=self.headers)
+
+        if response.status_code != 200:
+            return Response(
+                status_code=response.status_code,
+                error_code="PARENT_UPDATE_FAILED",
+                error_message=response.text
+            )
+
+        return Response()
+
     def update_workload_entry(self, schedule: ScheduleEntity) -> Response:
         """工数集計DBの更新"""
-        # まず、顧客先IDに対応する工数集計レコードを検索
         query_url = f"https://api.notion.com/v1/databases/{
             self.WORKLOAD_SUMMARY_DB_ID}/query"
         query_payload = {
@@ -200,18 +215,22 @@ class NotionWorkloadManagement:
         if not results:
             print(f"No workload entry found for client ID: {
                   schedule.client_id}")
-            return Response(status_code=404, error_code="NOT_FOUND", error_message="Workload entry not found")
+            return Response(
+                status_code=404,
+                error_code="NOT_FOUND",
+                error_message="Workload entry not found"
+            )
 
         # 既存の工数集計レコードを更新
         workload_entry_id = results[0]["id"]
         url = f"https://api.notion.com/v1/pages/{workload_entry_id}"
 
-        existing_tasl = results[0]["properties"][self.task_properties['task']]["relation"]
-        new_schedules = existing_tasl + [{"id": schedule.id}]
+        existing_tasks = results[0]["properties"][self.workload_properties['task']]["relation"]
+        new_schedules = existing_tasks + [{"id": schedule.id}]
 
         payload = {
             "properties": {
-                self.task_properties['task']: {
+                self.workload_properties['task']: {
                     "relation": new_schedules
                 }
             }
@@ -257,8 +276,16 @@ class NotionWorkloadManagement:
 
         for entry in new_entries:
             print(f"Processing entry: {entry.title}")
-            workload_response = self.update_workload_entry(entry)
 
+            # 親タスクの更新
+            parent_response = self.update_parent_task(entry)
+            if parent_response.status_code != 200:
+                print(f"Failed to update parent task for entry {
+                      entry.id}: {parent_response.error_message}")
+                continue
+
+            # 工数の更新
+            workload_response = self.update_workload_entry(entry)
             if workload_response.status_code == 200:
                 flag_response = self.update_schedule_flag(entry)
                 if flag_response.status_code != 200:
@@ -302,146 +329,3 @@ if __name__ == "__main__":
         NOTION_API_KEY, TASK_DB_ID, WORKLOAD_SUMMARY_DB_ID
     )
     workload_manager.run()
-
-# import requests
-# import time
-# from datetime import datetime
-# from typing import List, Dict, Any
-# from dotenv import load_dotenv
-# import os
-
-# load_dotenv()
-
-
-# class ScheduleEntity:
-#     def __init__(self, id: int, title: str, flag: int = 0, error_code: str = "", error_message: str = ""):
-#         self.id = id
-#         self.title = title
-#         self.flag = flag
-#         self.error_code = error_code
-#         self.error_message = error_message
-
-
-# class Response:
-#     def __init__(self, status_code: int = 200, error_code: str = "", error_message: str = ""):
-#         self.status_code = status_code
-#         self.error_code = error_code
-#         self.error_message = error_message
-
-
-# class NotionWorkloadManagement:
-#     def __init__(self, NOTION_API_KEY: str, TASK_DB_ID: str, WORKLOAD_SUMMARY_DB_ID: str):
-#         self.NOTION_API_KEY = NOTION_API_KEY
-#         self.TASK_DB_ID = TASK_DB_ID
-#         self.WORKLOAD_SUMMARY_DB_ID = WORKLOAD_SUMMARY_DB_ID
-#         self.headers = {
-#             "Authorization": f"Bearer {self.NOTION_API_KEY}",
-#             "Content-Type": "application/json",
-#             "Notion-Version": "2022-06-28"
-#         }
-
-#     def get_database_properties(self):
-#         url = f"https://api.notion.com/v1/databases/{self.TASK_DB_ID}"
-#         response = requests.get(url, headers=self.headers)
-#         if response.status_code != 200:
-#             print(f"Error fetching database properties: {response.text}")
-
-#         else:
-#             properties = response.json().get('properties', {})
-#             print("Available properties in the schedule database:")
-#             for prop_name, prop_info in properties.items():
-#                 print(f"- {prop_name} (type: {prop_info['type']})")
-
-#                 WORKLOAD_MANAGER.get_database_properties(TASK_DB_ID)
-
-#         print("NOTION_API_KEY:", self.NOTION_API_KEY)
-#         print("TASK_DB_ID:", self.TASK_DB_ID)
-#         print("WORKLOAD_SUMMARY_DB_ID:", self.WORKLOAD_SUMMARY_DB_ID)
-
-#     def get_new_schedule_entries(self) -> List[ScheduleEntity]:
-#         url = f"https://api.notion.com/v1/databases/{
-#             self.TASK_DB_ID}/query"
-#         payload = {
-#             "filter": {
-#                 "and": [
-#                     {"property": "フラグ", "status": {"equals": "追加前"}},
-#                     {"property": "顧問先", "relation": {"is_not_empty": True}}
-#                 ]
-#             }
-#         }
-#         response = requests.post(url, json=payload, headers=self.headers)
-
-#         if response.status_code != 200:
-#             print(f"Error fetching new schedule entries: {response.text}")
-#             return []
-
-#         results = response.json().get("results", [])
-#         return [ScheduleEntity(
-#             id=result["id"],
-#             title=result["properties"]["タイトル"]["title"][0]["plain_text"] if result["properties"]["タイトル"]["title"] else "",
-#             flag=result["properties"]["フラグ"]["status"]["name"]
-#         ) for result in results]
-
-#     def update_workload_entry(self, schedule: ScheduleEntity) -> Response:
-#         url = f"https://api.notion.com/v1/pages/{self.WORKLOAD_SUMMARY_DB_ID}"
-#         payload = {
-#             "properties": {
-#                 "予定": {
-#                     "relation": [{"id": schedule.id}]
-#                 }
-#             }
-#         }
-#         response = requests.patch(url, json=payload, headers=self.headers)
-
-#         if response.status_code != 200:
-#             return Response(status_code=response.status_code, error_code="UPDATE_FAILED", error_message=response.text)
-
-#         return Response()
-
-#     def update_schedule_flag(self, schedule: ScheduleEntity) -> Response:
-#         url = f"https://api.notion.com/v1/pages/{schedule.id}"
-#         payload = {
-#             "properties": {
-#                 "フラグ": {"status": "追加後"}
-#             }
-#         }
-#         response = requests.patch(url, json=payload, headers=self.headers)
-
-#         if response.status_code != 200:
-#             return Response(status_code=response.status_code, error_code="FLAG_UPDATE_FAILED", error_message=response.text)
-
-#         return Response()
-
-#     def process_new_entries(self):
-#         new_entries = self.get_new_schedule_entries()
-#         for entry in new_entries:
-#             workload_response = self.update_workload_entry(entry)
-#             if workload_response.status_code == 200:
-#                 flag_response = self.update_schedule_flag(entry)
-#                 if flag_response.status_code != 200:
-#                     print(f"Failed to update flag for entry {
-#                           entry.id}: {flag_response.error_message}")
-#             else:
-#                 print(f"Failed to update workload for entry {
-#                       entry.id}: {workload_response.error_message}")
-
-#     def run(self, interval: int = 15):
-#         while True:
-#             print(f"Processing new entries at {datetime.now()}")
-#             self.process_new_entries()
-#             time.sleep(interval)
-
-
-# if __name__ == "__main__":
-#     NOTION_API_KEY = os.getenv("notion_api_key")
-#     TASK_DB_ID = os.getenv("TASK_DB_ID")
-#     WORKLOAD_SUMMARY_DB_ID = os.getenv("WORKLOAD_SUMMARY_DB_ID")
-
-#     WORKLOAD_MANAGER = NotionWorkloadManagement(
-#         NOTION_API_KEY,  TASK_DB_ID, WORKLOAD_SUMMARY_DB_ID)
-#     WORKLOAD_MANAGER.run()
-
-
-# print("NOTION_API_KEYが読み込まれましたか？", bool(NOTION_API_KEY))
-# print("TASK_DB_IDが読み込まれましたか？", bool(TASK_DB_ID))
-# print("WORKLOAD_SUMMARY_DB_IDが読み込まれましたか？", bool(WORKLOAD_SUMMARY_DB_ID))
