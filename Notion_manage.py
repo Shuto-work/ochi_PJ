@@ -10,7 +10,7 @@ load_dotenv()
 
 class ScheduleEntity:
     def __init__(self, id: str, title: str, client_id: str = "", flag: str = "",
-                start_date: str = "", end_date: str = "", workload: float = 0):
+                 start_date: str = "", end_date: str = "", workload: float = 0):
         self.id = id
         self.title = title
         self.client_id = client_id
@@ -48,11 +48,11 @@ class NotionWorkloadManagement:
             'status': 'ステータス',
             'start_date': '開始日',
             'end_date': '終了日',
-            'task': '予定'  # 追加
+            'task': '予定'
         }
         # 工数集計DB用のプロパティ
         self.workload_properties = {
-            'task': '予定',  # schedule → task
+            'task': '予定',
             'client': '顧客先DB',
             'workload': '工数集計',
             'title': '名前'
@@ -94,8 +94,8 @@ class NotionWorkloadManagement:
                 "and": [
                     {
                         "property": self.task_properties['flag'],
-                        "status": {
-                            "equals": "追加前"
+                        "checkbox": {
+                            "equals": False
                         }
                     },
                     {
@@ -137,10 +137,10 @@ class NotionWorkloadManagement:
                     client_id = relations[0].get("id", "")
 
             # フラグ取得
-            flag = ""
+            flag = False
             if self.task_properties['flag'] in properties:
                 flag = properties[self.task_properties['flag']].get(
-                    "status", {}).get("name", "")
+                    "checkbox",  False)
 
             # 工数取得
             workload = 0
@@ -234,9 +234,7 @@ class NotionWorkloadManagement:
         payload = {
             "properties": {
                 self.task_properties['flag']: {
-                    "status": {
-                        "name": "追加後"
-                    }
+                    "checkbox": True
                 }
             }
         }
