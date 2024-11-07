@@ -2,6 +2,17 @@
 ## 仮想環境の構築
 https://zenn.dev/shuto2828/articles/python-virtual-env-setup-guide
 
+## 仮想環境の構築で必要なコマンドまとめ
+### requirements.txtの生成（開発環境構築時）
+pip freeze > requirements.txt
+
+### プロジェクトディレクトリへの移動
+cd your_pj_file
+
+### Gitクローン後の仮想環境作成とアクティベート
+python -m venv myenv
+source myenv/bin/activate  # macOS/Linux
+
 ## インストール
 ### 1, リポジトリをクローンする
 ```bash
