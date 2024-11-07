@@ -7,6 +7,7 @@ https://zenn.dev/shuto2828/articles/python-virtual-env-setup-guide
 ```
 pip freeze > requirements.txt
 ```
+https://www.cfxlog.com/python-requirements-txt/
 ### プロジェクトディレクトリへの移動
 ```
 cd your_pj_file
