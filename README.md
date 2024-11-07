@@ -48,3 +48,8 @@ WORKLOAD_SUMMARY_DB_ID=Your_task_WORKLOAD_SUMMARY_id
 ```
 python ファイル名.py
 ```
+
+```
+# 今回の場合は以下
+python notion_manage.py
+```
