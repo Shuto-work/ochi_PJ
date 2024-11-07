@@ -1,4 +1,6 @@
 # ochi_PJ
+## 仮想環境の構築
+https://zenn.dev/shuto2828/articles/python-virtual-env-setup-guide
 
 ## インストール
 ### 1, リポジトリをクローンする
