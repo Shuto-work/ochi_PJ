@@ -45,11 +45,11 @@ WORKLOAD_SUMMARY_DB_ID=Your_task_WORKLOAD_SUMMARY_id
 ・プロジェクトルートディレクトリに配置する。
 
 ### 実行コマンド
-```
+```zsh
 python ファイル名.py
 ```
 
-```
+```zsh
 # 今回の場合は以下
 python notion_manage.py
 ```
