@@ -28,6 +28,7 @@ TASK_DB_ID=Your_task_database_id
 WORKLOAD_SUMMARY_DB_ID=Your_task_WORKLOAD_SUMMARY_id
 ```
 ・「=」の前後はスペース無しで詰めて記述。
+
 ・プロジェクトルートディレクトリに配置する。
 
 ### 実行コマンド
